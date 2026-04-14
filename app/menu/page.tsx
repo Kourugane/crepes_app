@@ -8,6 +8,7 @@ import { ProductCard } from '@/components/product-card'
 import { Chatbot } from '@/components/chatbot'
 import { useStore } from '@/context/store-context'
 import { Button } from '@/components/ui/button'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const categories = [
@@ -22,7 +23,7 @@ export default function MenuPage() {
   const searchParams = useSearchParams()
   const initialCategory = searchParams.get('categoria') || 'all'
   const [selectedCategory, setSelectedCategory] = useState(initialCategory)
-  const { products } = useStore()
+  const { products, productsLoading } = useStore()
 
   const filteredProducts = useMemo(() => {
     if (selectedCategory === 'all') return products
@@ -55,8 +56,8 @@ export default function MenuPage() {
                 variant={selectedCategory === category.id ? "default" : "outline"}
                 className={cn(
                   "rounded-full px-6",
-                  selectedCategory === category.id 
-                    ? "bg-primary text-primary-foreground" 
+                  selectedCategory === category.id
+                    ? "bg-primary text-primary-foreground"
                     : "border-border hover:border-accent hover:text-accent"
                 )}
                 onClick={() => setSelectedCategory(category.id)}
@@ -66,15 +67,25 @@ export default function MenuPage() {
             ))}
           </div>
 
+          {/* Loading state */}
+          {productsLoading && (
+            <div className="flex items-center justify-center py-24 gap-3 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Cargando menú...</span>
+            </div>
+          )}
+
           {/* Products grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {!productsLoading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
 
           {/* Empty state */}
-          {filteredProducts.length === 0 && (
+          {!productsLoading && filteredProducts.length === 0 && (
             <div className="text-center py-16">
               <p className="text-muted-foreground">No hay productos en esta categoría.</p>
             </div>

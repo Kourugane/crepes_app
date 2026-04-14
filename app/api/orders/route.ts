@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET /api/orders - Obtener todos los pedidos (admin)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const customerId = searchParams.get('customer_id')
@@ -17,195 +17,154 @@ export async function GET(request: NextRequest) {
         items:order_items(
           id,
           quantity,
-          unit_price,
-          subtotal,
+          product_price,
+          total_price,
           customizations,
-          product:products(id, name, image_url)
+          product:products(id, name, image)
         )
       `)
       .order('created_at', { ascending: false })
 
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    if (customerId) {
-      query = query.eq('customer_id', customerId)
-    }
+    if (status) query = query.eq('status', status)
+    if (customerId) query = query.eq('customer_id', customerId)
 
     const { data: orders, error } = await query
 
     if (error) {
       console.error('Error fetching orders:', error)
-      return NextResponse.json(
-        { error: 'Error al obtener pedidos' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al obtener pedidos' }, { status: 500 })
     }
 
     return NextResponse.json({ orders })
   } catch (error) {
     console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Error del servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
 
-// POST /api/orders - Crear un nuevo pedido
+// POST /api/orders - Crear un nuevo pedido completo
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const body = await request.json()
 
-    const { customer, items, delivery_address, payment_method, notes } = body
+    const { customer, items, subtotal, tax, total, delivery_address, payment_method, notes } = body
 
     if (!customer || !items || items.length === 0) {
-      return NextResponse.json(
-        { error: 'Cliente e items son requeridos' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Cliente e items son requeridos' }, { status: 400 })
     }
 
-    // Crear o buscar cliente
+    // ─── 1. Crear o reutilizar cliente ─────────────────────────────────────
     let customerId: string
 
+    // Buscar por teléfono (no siempre hay email)
     const { data: existingCustomer } = await supabase
       .from('customers')
       .select('id')
-      .eq('email', customer.email)
-      .single()
+      .eq('phone', customer.phone)
+      .maybeSingle()
 
     if (existingCustomer) {
       customerId = existingCustomer.id
-      
-      // Actualizar datos del cliente
       await supabase
         .from('customers')
-        .update({
-          name: customer.name,
-          phone: customer.phone,
-          address: delivery_address
-        })
+        .update({ name: customer.name, email: customer.email || null, address: delivery_address })
         .eq('id', customerId)
     } else {
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
           name: customer.name,
-          email: customer.email,
+          email: customer.email || null,
           phone: customer.phone,
-          address: delivery_address
+          address: delivery_address,
         })
         .select('id')
         .single()
 
-      if (customerError) {
+      if (customerError || !newCustomer) {
         console.error('Error creating customer:', customerError)
-        return NextResponse.json(
-          { error: 'Error al crear cliente' },
-          { status: 500 }
-        )
+        return NextResponse.json({ error: 'Error al crear cliente' }, { status: 500 })
       }
-
       customerId = newCustomer.id
     }
 
-    // Calcular totales
-    const subtotal = items.reduce((sum: number, item: { subtotal: number }) => sum + item.subtotal, 0)
-    const tax = subtotal * 0.19 // IVA Colombia 19%
-    const total = subtotal + tax
+    // ─── 2. Generar número de orden único ──────────────────────────────────
+    const orderNumber = `CW-${Date.now().toString(36).toUpperCase()}`
 
-    // Crear pedido
+    // ─── 3. Calcular totales ───────────────────────────────────────────────
+    const computedSubtotal = subtotal ?? items.reduce((s: number, i: any) => s + i.total_price, 0)
+    const computedTax = tax ?? Math.round(computedSubtotal * 0.19)
+    const computedTotal = total ?? computedSubtotal + computedTax
+
+    // ─── 4. Crear orden ────────────────────────────────────────────────────
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
+        order_number: orderNumber,
         customer_id: customerId,
-        status: 'pending',
-        subtotal,
-        tax,
-        total,
-        delivery_address,
+        status: 'recibido',
+        total: computedTotal,
         payment_method,
-        notes
+        notes: notes || null,
       })
       .select('*')
       .single()
 
-    if (orderError) {
+    if (orderError || !order) {
       console.error('Error creating order:', orderError)
-      return NextResponse.json(
-        { error: 'Error al crear pedido' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al crear pedido' }, { status: 500 })
     }
 
-    // Crear items del pedido
-    const orderItems = items.map((item: {
-      product_id: string
-      quantity: number
-      unit_price: number
-      subtotal: number
-      customizations?: Record<string, string>
-    }) => ({
+    // ─── 5. Crear order_items ──────────────────────────────────────────────
+    const orderItems = items.map((item: any) => ({
       order_id: order.id,
-      product_id: item.product_id,
+      product_id: item.product_id || null,
+      product_name: item.product_name,
+      product_price: item.product_price,
       quantity: item.quantity,
-      unit_price: item.unit_price,
-      subtotal: item.subtotal,
-      customizations: item.customizations || {}
+      customizations: item.customizations || {},
+      total_price: item.total_price,
     }))
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems)
+    const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
 
     if (itemsError) {
       console.error('Error creating order items:', itemsError)
-      // Rollback: eliminar el pedido
+      // Rollback
       await supabase.from('orders').delete().eq('id', order.id)
-      return NextResponse.json(
-        { error: 'Error al crear items del pedido' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al guardar items del pedido' }, { status: 500 })
     }
 
-    // Crear factura
-    const invoiceNumber = `CW-${Date.now().toString(36).toUpperCase()}`
-    
+    // ─── 6. Crear factura con IVA ──────────────────────────────────────────
+    const invoiceNumber = `FAC-${orderNumber}`
+
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .insert({
-        order_id: order.id,
         invoice_number: invoiceNumber,
-        subtotal,
-        tax,
-        total,
-        customer_name: customer.name,
-        customer_email: customer.email,
-        customer_address: delivery_address,
-        status: 'issued'
+        order_id: order.id,
+        subtotal: computedSubtotal,
+        tax: computedTax,
+        total: computedTotal,
       })
       .select('*')
       .single()
 
     if (invoiceError) {
-      console.error('Error creating invoice:', invoiceError)
+      console.error('Error creating invoice (non-fatal):', invoiceError)
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       order: {
         ...order,
-        invoice_number: invoice?.invoice_number
+        invoice_number: invoice?.invoice_number,
       },
-      invoice 
+      invoice,
     }, { status: 201 })
+
   } catch (error) {
     console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Error del servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }

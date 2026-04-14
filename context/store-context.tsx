@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { supabase } from '@/lib/supabase/client'
 
 // Types
 export interface Product {
@@ -29,23 +30,38 @@ export interface CartItem {
 
 export interface Order {
   id: string
+  order_number: string
   items: CartItem[]
   customer: CustomerInfo
   status: 'recibido' | 'preparacion' | 'en-camino' | 'entregado'
+  subtotal: number
+  tax: number
   total: number
   createdAt: Date
   paymentMethod: string
+  invoice_number?: string
 }
 
 export interface CustomerInfo {
   name: string
+  email?: string
   address: string
   phone: string
   paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia'
 }
 
+const CATEGORY_SLUG_MAP: Record<string, Product['category']> = {
+  'desayunos': 'desayunos',
+  'postres': 'postres',
+  'platos-fuertes': 'platos-fuertes',
+  'bebidas': 'bebidas',
+  'Desayunos': 'desayunos',
+  'Postres': 'postres',
+  'Platos Fuertes': 'platos-fuertes',
+  'Bebidas': 'bebidas',
+}
+
 interface StoreContextType {
-  // Cart
   cart: CartItem[]
   addToCart: (product: Product, quantity: number, customizations: { [key: string]: string }) => void
   removeFromCart: (itemId: string) => void
@@ -53,160 +69,83 @@ interface StoreContextType {
   clearCart: () => void
   cartTotal: number
   cartCount: number
-  
-  // Orders
   orders: Order[]
   currentOrder: Order | null
-  createOrder: (customer: CustomerInfo) => Order
+  createOrder: (customer: CustomerInfo) => Promise<Order>
   updateOrderStatus: (orderId: string, status: Order['status']) => void
-  
-  // Products
   products: Product[]
-  
-  // Admin
-  addProduct: (product: Omit<Product, 'id'>) => void
-  updateProduct: (id: string, product: Partial<Product>) => void
-  deleteProduct: (id: string) => void
+  productsLoading: boolean
+  addProduct: (product: Omit<Product, 'id'>) => Promise<void>
+  updateProduct: (id: string, product: Partial<Product>) => Promise<void>
+  deleteProduct: (id: string) => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
-// Sample Products
-const initialProducts: Product[] = [
-  // Desayunos
-  {
-    id: '1',
-    name: 'Crepe de Jamón y Queso',
-    description: 'Delicioso crepe relleno de jamón ahumado y queso derretido, acompañado de ensalada fresca',
-    price: 28000,
-    image: '/images/crepe-jamon-queso.jpg',
-    category: 'desayunos',
-    customizations: [
-      { id: 'queso', name: 'Tipo de Queso', options: [
-        { id: 'mozzarella', name: 'Mozzarella', price: 0 },
-        { id: 'cheddar', name: 'Cheddar', price: 2000 },
-        { id: 'gouda', name: 'Gouda', price: 3000 }
-      ]}
-    ]
-  },
-  {
-    id: '2',
-    name: 'Waffle Clásico',
-    description: 'Waffle belga tradicional con mantequilla y miel de maple, servido con frutas frescas',
-    price: 24000,
-    image: '/images/waffle-clasico.jpg',
-    category: 'desayunos'
-  },
-  {
-    id: '3',
-    name: 'Crepe de Pollo',
-    description: 'Crepe relleno de pollo desmenuzado con champiñones en salsa bechamel',
-    price: 32000,
-    image: '/images/crepe-pollo.jpg',
-    category: 'desayunos'
-  },
-  // Postres
-  {
-    id: '4',
-    name: 'Crepe de Nutella',
-    description: 'Crepe con generosa porción de Nutella, fresas frescas y crema chantilly',
-    price: 22000,
-    image: '/images/crepe-nutella.jpg',
-    category: 'postres',
-    customizations: [
-      { id: 'topping', name: 'Topping Extra', options: [
-        { id: 'ninguno', name: 'Sin topping extra', price: 0 },
-        { id: 'helado', name: 'Helado de Vainilla', price: 5000 },
-        { id: 'banana', name: 'Banano', price: 3000 }
-      ]}
-    ]
-  },
-  {
-    id: '5',
-    name: 'Waffle con Helado',
-    description: 'Waffle tibio con tres bolas de helado, salsa de chocolate y nueces caramelizadas',
-    price: 28000,
-    image: '/images/waffle-helado.jpg',
-    category: 'postres'
-  },
-  {
-    id: '6',
-    name: 'Tiramisú',
-    description: 'Clásico tiramisú italiano con café espresso y cacao',
-    price: 18000,
-    image: '/images/tiramisu.jpg',
-    category: 'postres'
-  },
-  // Platos Fuertes
-  {
-    id: '7',
-    name: 'Salmón a la Parrilla',
-    description: 'Filete de salmón atlántico a la parrilla con vegetales grillados y arroz jazmín',
-    price: 52000,
-    image: '/images/salmon.jpg',
-    category: 'platos-fuertes',
-    customizations: [
-      { id: 'coccion', name: 'Punto de Cocción', options: [
-        { id: 'medio', name: 'Término Medio', price: 0 },
-        { id: 'bien', name: 'Bien Cocido', price: 0 }
-      ]}
-    ]
-  },
-  {
-    id: '8',
-    name: 'Lomo de Res',
-    description: 'Medallón de lomo de res en salsa de champiñones, puré de papa y espárragos',
-    price: 58000,
-    image: '/images/lomo-res.jpg',
-    category: 'platos-fuertes'
-  },
-  {
-    id: '9',
-    name: 'Pechuga de Pollo',
-    description: 'Pechuga de pollo rellena de espinacas y queso, con salsa de albahaca',
-    price: 42000,
-    image: '/images/pechuga-pollo.jpg',
-    category: 'platos-fuertes'
-  },
-  // Bebidas
-  {
-    id: '10',
-    name: 'Limonada Natural',
-    description: 'Limonada refrescante con hierbabuena y un toque de jengibre',
-    price: 12000,
-    image: '/images/limonada.jpg',
-    category: 'bebidas'
-  },
-  {
-    id: '11',
-    name: 'Café Americano',
-    description: 'Café premium colombiano de origen único',
-    price: 8000,
-    image: '/images/cafe.jpg',
-    category: 'bebidas'
-  },
-  {
-    id: '12',
-    name: 'Jugo Natural',
-    description: 'Jugo de frutas frescas de temporada',
-    price: 14000,
-    image: '/images/jugo.jpg',
-    category: 'bebidas',
-    customizations: [
-      { id: 'fruta', name: 'Fruta', options: [
-        { id: 'naranja', name: 'Naranja', price: 0 },
-        { id: 'mango', name: 'Mango', price: 2000 },
-        { id: 'maracuya', name: 'Maracuyá', price: 2000 }
-      ]}
-    ]
+function mapSupabaseProduct(p: any): Product {
+  const categorySlug =
+    CATEGORY_SLUG_MAP[p.category?.slug] ||
+    CATEGORY_SLUG_MAP[p.category?.name] ||
+    'desayunos'
+
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: p.price,
+    image: p.image || `/images/${p.name.toLowerCase().replace(/\s+/g, '-')}.jpg`,
+    category: categorySlug,
+    customizations: p.customizations?.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      options: (c.options || []).map((o: any) => ({
+        id: o.id,
+        name: o.name,
+        price: o.price_modifier ?? o.price ?? 0,
+      })),
+    })),
   }
-]
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null)
-  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [products, setProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+
+  // Cargar productos desde Supabase al iniciar
+  useEffect(() => {
+  async function fetchProducts() {
+    setProductsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(id, name, slug)
+        `)
+        .eq('is_active', true)
+        .order('name')
+
+      if (error) {
+        console.error('Error cargando productos:', JSON.stringify(error, null, 2))
+        return
+      }
+
+      console.log('Productos encontrados:', data?.length)
+      if (data && data.length > 0) {
+        setProducts(data.map(mapSupabaseProduct))
+      }
+    } catch (err) {
+      console.error('Error inesperado:', err)
+    } finally {
+      setProductsLoading(false)
+    }
+  }
+
+  fetchProducts()
+}, [])
 
   const addToCart = useCallback((product: Product, quantity: number, customizations: { [key: string]: string }) => {
     const customizationPrice = Object.entries(customizations).reduce((total, [customId, optionId]) => {
@@ -214,17 +153,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const option = custom?.options.find(o => o.id === optionId)
       return total + (option?.price || 0)
     }, 0)
-    
+
     const totalPrice = (product.price + customizationPrice) * quantity
-    
+
     const newItem: CartItem = {
       id: `${product.id}-${Date.now()}`,
       product,
       quantity,
       selectedCustomizations: customizations,
-      totalPrice
+      totalPrice,
     }
-    
+
     setCart(prev => [...prev, newItem])
   }, [])
 
@@ -249,26 +188,69 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const cartTotal = cart.reduce((total, item) => total + item.totalPrice, 0)
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0)
 
-  const createOrder = useCallback((customer: CustomerInfo): Order => {
+  // Crear orden real en Supabase
+  const createOrder = useCallback(async (customer: CustomerInfo): Promise<Order> => {
+    const subtotal = cartTotal
+    const tax = Math.round(subtotal * 0.19)
+    const total = subtotal + tax
+
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: {
+          name: customer.name,
+          email: customer.email || '',
+          phone: customer.phone,
+          address: customer.address,
+        },
+        items: cart.map(item => ({
+          product_id: item.product.id,
+          product_name: item.product.name,
+          product_price: item.product.price,
+          quantity: item.quantity,
+          customizations: item.selectedCustomizations,
+          total_price: item.totalPrice,
+        })),
+        subtotal,
+        tax,
+        total,
+        payment_method: customer.paymentMethod,
+        delivery_address: customer.address,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json()
+      throw new Error(err.error || 'Error al crear el pedido')
+    }
+
+    const data = await response.json()
+    const dbOrder = data.order
+
     const order: Order = {
-      id: `ORD-${Date.now().toString(36).toUpperCase()}`,
+      id: dbOrder.id,
+      order_number: dbOrder.order_number,
       items: [...cart],
       customer,
       status: 'recibido',
-      total: cartTotal,
-      createdAt: new Date(),
-      paymentMethod: customer.paymentMethod
+      subtotal,
+      tax,
+      total,
+      createdAt: new Date(dbOrder.created_at),
+      paymentMethod: customer.paymentMethod,
+      invoice_number: data.invoice?.invoice_number,
     }
-    
+
     setOrders(prev => [...prev, order])
     setCurrentOrder(order)
     setCart([])
-    
+
     return order
   }, [cart, cartTotal])
 
   const updateOrderStatus = useCallback((orderId: string, status: Order['status']) => {
-    setOrders(prev => prev.map(order => 
+    setOrders(prev => prev.map(order =>
       order.id === orderId ? { ...order, status } : order
     ))
     if (currentOrder?.id === orderId) {
@@ -276,19 +258,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [currentOrder])
 
-  const addProduct = useCallback((product: Omit<Product, 'id'>) => {
-    const newProduct: Product = {
-      ...product,
-      id: Date.now().toString()
-    }
-    setProducts(prev => [...prev, newProduct])
+  const addProduct = useCallback(async (product: Omit<Product, 'id'>) => {
+    const response = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        image_url: product.image,
+        category_slug: product.category,
+        is_active: true,
+      }),
+    })
+    if (!response.ok) throw new Error('Error al crear producto')
+    const data = await response.json()
+    setProducts(prev => [...prev, mapSupabaseProduct(data.product)])
   }, [])
 
-  const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+  const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
+    const response = await fetch(`/api/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: updates.name,
+        description: updates.description,
+        price: updates.price,
+        image_url: updates.image,
+        category_slug: updates.category,
+        is_active: true,
+      }),
+    })
+    if (!response.ok) throw new Error('Error al actualizar producto')
+    const data = await response.json()
+    setProducts(prev => prev.map(p => p.id === id ? mapSupabaseProduct(data.product) : p))
   }, [])
 
-  const deleteProduct = useCallback((id: string) => {
+  const deleteProduct = useCallback(async (id: string) => {
+    const response = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    if (!response.ok) throw new Error('Error al eliminar producto')
     setProducts(prev => prev.filter(p => p.id !== id))
   }, [])
 
@@ -306,9 +314,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createOrder,
       updateOrderStatus,
       products,
+      productsLoading,
       addProduct,
       updateProduct,
-      deleteProduct
+      deleteProduct,
     }}>
       {children}
     </StoreContext.Provider>

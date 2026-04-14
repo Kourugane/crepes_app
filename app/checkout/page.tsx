@@ -14,15 +14,22 @@ import { cn } from '@/lib/utils'
 export default function CheckoutPage() {
   const router = useRouter()
   const { cart, cartTotal, createOrder } = useStore()
-  
+
   const [formData, setFormData] = useState<CustomerInfo>({
     name: '',
+    email: '',
     address: '',
     phone: '',
-    paymentMethod: 'efectivo'
+    paymentMethod: 'efectivo',
   })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const IVA_RATE = 0.19
+  const subtotal = cartTotal
+  const tax = Math.round(subtotal * IVA_RATE)
+  const total = subtotal + tax
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -34,43 +41,42 @@ export default function CheckoutPage() {
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {}
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre es requerido'
-    }
-    if (!formData.address.trim()) {
-      newErrors.address = 'La dirección es requerida'
-    }
+
+    if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
+    if (!formData.address.trim()) newErrors.address = 'La dirección es requerida'
     if (!formData.phone.trim()) {
       newErrors.phone = 'El teléfono es requerido'
     } else if (!/^[0-9]{7,15}$/.test(formData.phone.replace(/\s/g, ''))) {
       newErrors.phone = 'Ingresa un teléfono válido'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     setIsSubmitting(true)
-    
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    const order = createOrder(formData)
-    router.push(`/confirmacion/${order.id}`)
+    setSubmitError(null)
+
+    try {
+      // createOrder ahora es async y guarda en Supabase
+      const order = await createOrder(formData)
+      router.push(`/confirmacion/${order.id}`)
+    } catch (err: any) {
+      console.error('Error al crear pedido:', err)
+      setSubmitError(err.message || 'Error al procesar el pedido. Intenta de nuevo.')
+      setIsSubmitting(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }))
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
   }
 
   const paymentMethods = [
@@ -103,8 +109,7 @@ export default function CheckoutPage() {
       <Header />
       <main className="min-h-screen pt-24 pb-16">
         <div className="mx-auto max-w-5xl px-6 lg:px-8">
-          {/* Back button */}
-          <Link 
+          <Link
             href="/carrito"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
@@ -112,7 +117,6 @@ export default function CheckoutPage() {
             Volver al carrito
           </Link>
 
-          {/* Page header */}
           <div className="text-center mb-12">
             <p className="text-sm font-medium tracking-widest text-accent uppercase mb-2">
               Finalizar Compra
@@ -122,11 +126,16 @@ export default function CheckoutPage() {
             </h1>
           </div>
 
+          {submitError && (
+            <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive text-destructive text-sm">
+              {submitError}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Form */}
               <div className="lg:col-span-2 space-y-8">
-                {/* Customer info */}
                 <div className="bg-card rounded-2xl border border-border p-6">
                   <h2 className="font-serif text-xl font-semibold text-foreground mb-6">
                     Datos de Entrega
@@ -149,9 +158,22 @@ export default function CheckoutPage() {
                         )}
                         placeholder="Juan Pérez"
                       />
-                      {errors.name && (
-                        <p className="mt-1 text-sm text-destructive">{errors.name}</p>
-                      )}
+                      {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                        Email <span className="text-muted-foreground">(opcional)</span>
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email || ''}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="juan@email.com"
+                      />
                     </div>
 
                     <div>
@@ -170,9 +192,7 @@ export default function CheckoutPage() {
                         )}
                         placeholder="Calle 123 #45-67, Apartamento 101, Bogotá"
                       />
-                      {errors.address && (
-                        <p className="mt-1 text-sm text-destructive">{errors.address}</p>
-                      )}
+                      {errors.address && <p className="mt-1 text-sm text-destructive">{errors.address}</p>}
                     </div>
 
                     <div>
@@ -191,9 +211,7 @@ export default function CheckoutPage() {
                         )}
                         placeholder="300 123 4567"
                       />
-                      {errors.phone && (
-                        <p className="mt-1 text-sm text-destructive">{errors.phone}</p>
-                      )}
+                      {errors.phone && <p className="mt-1 text-sm text-destructive">{errors.phone}</p>}
                     </div>
                   </div>
                 </div>
@@ -239,9 +257,7 @@ export default function CheckoutPage() {
                           </div>
                           <div className={cn(
                             "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                            formData.paymentMethod === method.id
-                              ? "border-accent"
-                              : "border-border"
+                            formData.paymentMethod === method.id ? "border-accent" : "border-border"
                           )}>
                             {formData.paymentMethod === method.id && (
                               <div className="w-2.5 h-2.5 rounded-full bg-accent" />
@@ -290,7 +306,11 @@ export default function CheckoutPage() {
                   <div className="space-y-3 pt-4 border-t border-border">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-medium text-foreground">{formatPrice(cartTotal)}</span>
+                      <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">IVA (19%)</span>
+                      <span className="font-medium text-foreground">{formatPrice(tax)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Envío</span>
@@ -299,7 +319,7 @@ export default function CheckoutPage() {
                     <div className="flex justify-between pt-3 border-t border-border">
                       <span className="font-semibold text-foreground">Total</span>
                       <span className="font-serif text-xl font-bold text-accent">
-                        {formatPrice(cartTotal)}
+                        {formatPrice(total)}
                       </span>
                     </div>
                   </div>

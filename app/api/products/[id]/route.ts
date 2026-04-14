@@ -1,14 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-// GET /api/products/[id] - Obtener un producto específico con sus personalizaciones
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
     const { data: product, error } = await supabase
       .from('products')
@@ -18,8 +17,6 @@ export async function GET(
         customizations(
           id,
           name,
-          type,
-          is_required,
           options:customization_options(id, name, price_modifier)
         )
       `)
@@ -27,47 +24,48 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('Error fetching product:', error)
-      return NextResponse.json(
-        { error: 'Producto no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
     }
 
     return NextResponse.json({ product })
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Error del servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
 
-// PUT /api/products/[id] - Actualizar un producto (admin)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const body = await request.json()
 
-    const { name, description, price, image_url, category_id, is_featured, is_active } = body
+    const { name, description, price, image_url, category_id, category_slug, is_active } = body
+
+    // Resolver category_id desde slug si no viene directo
+    let resolvedCategoryId = category_id
+    if (!resolvedCategoryId && category_slug) {
+      const { data: cat } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', category_slug)
+        .single()
+      resolvedCategoryId = cat?.id || null
+    }
+
+    const updates: any = { updated_at: new Date().toISOString() }
+    if (name !== undefined) updates.name = name
+    if (description !== undefined) updates.description = description
+    if (price !== undefined) updates.price = parseFloat(price)
+    if (image_url !== undefined) updates.image = image_url
+    if (resolvedCategoryId !== undefined) updates.category_id = resolvedCategoryId
+    if (is_active !== undefined) updates.is_active = is_active
 
     const { data: product, error } = await supabase
       .from('products')
-      .update({
-        name,
-        description,
-        price: price ? parseFloat(price) : undefined,
-        image_url,
-        category_id,
-        is_featured,
-        is_active,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', id)
       .select(`
         *,
@@ -77,50 +75,36 @@ export async function PUT(
 
     if (error) {
       console.error('Error updating product:', error)
-      return NextResponse.json(
-        { error: 'Error al actualizar producto' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al actualizar producto' }, { status: 500 })
     }
 
     return NextResponse.json({ product })
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Error del servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
 
-// DELETE /api/products/[id] - Eliminar un producto (admin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
+    // Soft delete: marcar como inactivo en lugar de borrar
     const { error } = await supabase
       .from('products')
-      .delete()
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
 
     if (error) {
       console.error('Error deleting product:', error)
-      return NextResponse.json(
-        { error: 'Error al eliminar producto' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al eliminar producto' }, { status: 500 })
     }
 
     return NextResponse.json({ message: 'Producto eliminado exitosamente' })
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Error del servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }

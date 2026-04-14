@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { useStore, type Product } from '@/context/store-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const categories = [
@@ -26,10 +26,12 @@ const emptyForm: ProductForm = {
 }
 
 export default function AdminProductsPage() {
-  const { products, addProduct, updateProduct, deleteProduct } = useStore()
+  const { products, productsLoading, addProduct, updateProduct, deleteProduct } = useStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState<ProductForm>(emptyForm)
+  const [isSaving, setIsSaving] = useState(false)
+  const [savingError, setSavingError] = useState<string | null>(null)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -49,6 +51,7 @@ export default function AdminProductsPage() {
   const openCreateModal = () => {
     setEditingProduct(null)
     setFormData(emptyForm)
+    setSavingError(null)
     setIsModalOpen(true)
   }
 
@@ -61,27 +64,49 @@ export default function AdminProductsPage() {
       image: product.image,
       category: product.category,
     })
+    setSavingError(null)
     setIsModalOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (editingProduct) {
-      updateProduct(editingProduct.id, formData)
-    } else {
-      addProduct(formData)
+    setIsSaving(true)
+    setSavingError(null)
+
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, formData)
+      } else {
+        await addProduct(formData)
+      }
+      setIsModalOpen(false)
+      setFormData(emptyForm)
+      setEditingProduct(null)
+    } catch (err: any) {
+      setSavingError(err.message || 'Error al guardar el producto')
+    } finally {
+      setIsSaving(false)
     }
-    
-    setIsModalOpen(false)
-    setFormData(emptyForm)
-    setEditingProduct(null)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar este producto?')) {
-      deleteProduct(id)
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este producto?')) return
+    try {
+      await deleteProduct(id)
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar el producto')
     }
+  }
+
+  if (productsLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Cargando productos...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -135,7 +160,7 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="py-3 px-2">
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                        {categoryLabels[product.category]}
+                        {categoryLabels[product.category] || product.category}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right font-medium text-foreground">
@@ -165,6 +190,12 @@ export default function AdminProductsPage() {
                 ))}
               </tbody>
             </table>
+
+            {products.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                No hay productos. Crea el primero.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -183,11 +214,15 @@ export default function AdminProductsPage() {
               </Button>
             </div>
 
+            {savingError && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive text-destructive text-sm">
+                {savingError}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Nombre
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Nombre</label>
                 <input
                   type="text"
                   value={formData.name}
@@ -198,9 +233,7 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Descripción
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Descripción</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -211,9 +244,7 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Precio (COP)
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Precio (COP)</label>
                 <input
                   type="number"
                   value={formData.price}
@@ -225,9 +256,7 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Categoría
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Categoría</label>
                 <div className="flex flex-wrap gap-2">
                   {categories.map((cat) => (
                     <button
@@ -248,9 +277,7 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  URL de Imagen
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">URL de Imagen</label>
                 <input
                   type="text"
                   value={formData.image}
@@ -261,11 +288,15 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)} disabled={isSaving}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                  {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={isSaving}>
+                  {isSaving ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando...</>
+                  ) : (
+                    editingProduct ? 'Guardar Cambios' : 'Crear Producto'
+                  )}
                 </Button>
               </div>
             </form>
