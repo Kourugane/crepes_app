@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET /api/customers - Obtener todos los clientes (admin)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 // GET customer by email
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const body = await request.json()
     const { email } = body
 

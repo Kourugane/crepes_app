@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 // GET /api/categories - Obtener todas las categorías
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
     const { data: categories, error } = await supabase
       .from('categories')

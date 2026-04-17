@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET /api/orders/[id] - Obtener un pedido específico
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
     const { data: order, error } = await supabase
       .from('orders')
@@ -53,7 +53,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const body = await request.json()
 
     const { status, notes } = body
@@ -109,7 +109,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
     const { data: order, error } = await supabase
       .from('orders')

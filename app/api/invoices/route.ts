@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET /api/invoices - Obtener todas las facturas (admin)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const orderId = searchParams.get('order_id')

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // GET /api/invoices/[id] - Obtener una factura específica
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
 
     // Buscar por ID o por número de factura
     let query = supabase
@@ -69,7 +69,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = supabaseServer()
     const body = await request.json()
 
     const { status } = body
