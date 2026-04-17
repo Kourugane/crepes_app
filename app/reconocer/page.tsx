@@ -1,10 +1,19 @@
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
-import { DishRecognition } from '@/components/dish-recognition'
+
 import { Chatbot } from '@/components/chatbot'
 import type { Metadata } from 'next'
 import { supabase } from "@/lib/supabase/client"
 import TestDBButton from "@/components/TestDBButton"
+import dynamic from "next/dynamic"
+
+const DishRecognition = dynamic(
+  () =>
+    import("@/components/dish-recognition").then(
+      (mod) => mod.DishRecognition
+    ),
+  { ssr: false }
+)
 
 export const metadata: Metadata = {
   title: 'Reconocimiento de Platos | Crepes & Waffles',
