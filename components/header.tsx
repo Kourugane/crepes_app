@@ -72,7 +72,7 @@ export function Header() {
 
 {/* Mobile menu */}
 {mobileMenuOpen && (
-  <div className="fixed inset-0 z-50 lg:hidden bg-background flex flex-col">
+  <div className="fixed inset-0 z-50 lg:hidden flex flex-col" style={{ backgroundColor: 'var(--background)', backdropFilter: 'none', isolation: 'isolate' }}>
     {/* Header */}
     <div className="flex items-center justify-between px-6 py-5 border-b border-border">
       <Link href="/" onClick={() => setMobileMenuOpen(false)}>
