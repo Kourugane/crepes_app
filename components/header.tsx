@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Menu, X, ShoppingBag, User } from 'lucide-react'
+import { Menu, X, ShoppingBag, User, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useStore } from '@/context/store-context'
 
@@ -41,6 +41,9 @@ export function Header() {
           </Link>
           <Link href="/menu" className="text-sm font-medium text-foreground hover:text-accent transition-colors">
             Menú
+          </Link>
+          <Link href="/reconocer" className="text-sm font-medium text-foreground hover:text-accent transition-colors">
+            Reconocer Plato
           </Link>
           <Link href="/seguimiento" className="text-sm font-medium text-foreground hover:text-accent transition-colors">
             Seguimiento
@@ -96,6 +99,14 @@ export function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Menú
+                  </Link>
+                  <Link
+                    href="/reconocer"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Camera className="h-5 w-5" />
+                    Reconocer Plato
                   </Link>
                   <Link
                     href="/seguimiento"
