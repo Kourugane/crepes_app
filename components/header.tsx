@@ -70,75 +70,90 @@ export function Header() {
         </div>
       </nav>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-background px-6 py-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <Link href="/" className="-m-1.5 p-1.5" onClick={() => setMobileMenuOpen(false)}>
-                <span className="font-serif text-xl font-bold text-foreground">Crepes & Waffles</span>
-              </Link>
-              <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} aria-label="Cerrar menú">
-                <X className="h-6 w-6" />
-              </Button>
-            </div>
-            <div className="mt-6 flow-root">
-              <div className="-my-6 divide-y divide-border">
-                <div className="space-y-2 py-6">
-                  <Link
-                    href="/"
-                    className="block rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Inicio
-                  </Link>
-                  <Link
-                    href="/menu"
-                    className="block rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Menú
-                  </Link>
-                  <Link
-                    href="/reconocer"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Camera className="h-5 w-5" />
-                    Reconocer Plato
-                  </Link>
-                  <Link
-                    href="/seguimiento"
-                    className="block rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Seguimiento
-                  </Link>
-                </div>
-                <div className="py-6 space-y-2">
-                  <Link
-                    href="/carrito"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <ShoppingBag className="h-5 w-5" />
-                    Carrito ({cartCount})
-                  </Link>
-                  <Link
-                    href="/admin"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium text-foreground hover:bg-secondary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <User className="h-5 w-5" />
-                    Administración
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
+{/* Mobile menu */}
+{mobileMenuOpen && (
+  <div className="fixed inset-0 z-50 lg:hidden">
+    {/* Overlay oscuro detrás */}
+    <div 
+      className="fixed inset-0 bg-black/50" 
+      onClick={() => setMobileMenuOpen(false)} 
+    />
+    {/* Panel del menú */}
+    <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-background shadow-2xl flex flex-col">
+      {/* Header del menú */}
+      <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+        <Link href="/" className="-m-1.5 p-1.5" onClick={() => setMobileMenuOpen(false)}>
+          <span className="font-serif text-xl font-bold text-foreground">Crepes & Waffles</span>
+        </Link>
+        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} aria-label="Cerrar menú">
+          <X className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Links de navegación */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="space-y-1">
+          <Link
+            href="/"
+            className="flex items-center rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Inicio
+          </Link>
+          <Link
+            href="/menu"
+            className="flex items-center rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Menú
+          </Link>
+          <Link
+            href="/reconocer"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Camera className="h-5 w-5 text-accent" />
+            Reconocer Plato
+          </Link>
+          <Link
+            href="/seguimiento"
+            className="flex items-center rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Seguimiento
+          </Link>
         </div>
-      )}
+
+        {/* Divider */}
+        <div className="my-6 border-t border-border" />
+
+        <div className="space-y-1">
+          <Link
+            href="/carrito"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <ShoppingBag className="h-5 w-5 text-accent" />
+            Carrito
+            {cartCount > 0 && (
+              <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-foreground hover:bg-secondary transition-colors"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <User className="h-5 w-5 text-accent" />
+            Administración
+          </Link>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </header>
   )
 }
