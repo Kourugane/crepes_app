@@ -1,6 +1,6 @@
 "use client"
-export const dynamic = 'force-dynamic'  // ← agrega esta línea
-import { useState, useMemo } from 'react'
+
+import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
@@ -10,7 +10,6 @@ import { useStore } from '@/context/store-context'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Suspense } from "react"
 
 const categories = [
   { id: 'all', name: 'Todos' },
@@ -20,7 +19,7 @@ const categories = [
   { id: 'bebidas', name: 'Bebidas' },
 ]
 
-export default function MenuPage() {
+function MenuContent() {
   const searchParams = useSearchParams()
   const initialCategory = searchParams.get('categoria') || 'all'
   const [selectedCategory, setSelectedCategory] = useState(initialCategory)
@@ -36,7 +35,6 @@ export default function MenuPage() {
       <Header />
       <main className="min-h-screen pt-24 pb-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          {/* Page header */}
           <div className="text-center mb-12">
             <p className="text-sm font-medium tracking-widest text-accent uppercase mb-2">
               Nuestra Carta
@@ -49,7 +47,6 @@ export default function MenuPage() {
             </p>
           </div>
 
-          {/* Category filters */}
           <div className="flex flex-wrap justify-center gap-2 mb-12">
             {categories.map((category) => (
               <Button
@@ -68,7 +65,6 @@ export default function MenuPage() {
             ))}
           </div>
 
-          {/* Loading state */}
           {productsLoading && (
             <div className="flex items-center justify-center py-24 gap-3 text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -76,7 +72,6 @@ export default function MenuPage() {
             </div>
           )}
 
-          {/* Products grid */}
           {!productsLoading && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
@@ -85,7 +80,6 @@ export default function MenuPage() {
             </div>
           )}
 
-          {/* Empty state */}
           {!productsLoading && filteredProducts.length === 0 && (
             <div className="text-center py-16">
               <p className="text-muted-foreground">No hay productos en esta categoría.</p>
@@ -96,5 +90,20 @@ export default function MenuPage() {
       <Footer />
       <Chatbot />
     </>
+  )
+}
+
+export default function MenuPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-24 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Cargando menú...</span>
+        </div>
+      </div>
+    }>
+      <MenuContent />
+    </Suspense>
   )
 }
