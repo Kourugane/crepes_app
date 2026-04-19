@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = 'force-dynamic'  // ← agrega esta línea
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
