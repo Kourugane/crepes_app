@@ -24,7 +24,7 @@ export default function RecognizePage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       
-      <main className="flex-1">
+      <main className="min-h-screen pt-24">
         <section className="py-12">
           <div className="container mx-auto px-4">
             <div className="mb-8 text-center">
