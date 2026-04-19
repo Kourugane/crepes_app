@@ -5,15 +5,8 @@ import { Chatbot } from '@/components/chatbot'
 import type { Metadata } from 'next'
 import { supabase } from "@/lib/supabase/client"
 import TestDBButton from "@/components/TestDBButton"
-import dynamic from "next/dynamic"
 
-const DishRecognition = dynamic(
-  () =>
-    import("@/components/dish-recognition").then(
-      (mod) => mod.DishRecognition
-    ),
-  { ssr: false }
-)
+import DishRecognitionClient from "@/components/DishRecognitionClient"
 
 export const metadata: Metadata = {
   title: 'Reconocimiento de Platos | Crepes & Waffles',
@@ -45,7 +38,7 @@ export default function RecognizePage() {
             </div>
             
             <div className="mx-auto max-w-2xl">
-              <DishRecognition />
+              <DishRecognitionClient />
 
 <TestDBButton />
             </div>

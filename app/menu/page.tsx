@@ -10,6 +10,7 @@ import { useStore } from '@/context/store-context'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Suspense } from "react"
 
 const categories = [
   { id: 'all', name: 'Todos' },
